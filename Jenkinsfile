@@ -1,23 +1,36 @@
-pipeline{
-	agent { label 'slave-2'}
-	stages{
-        stage('Build stage') {
+pipeline {
+    agent any
+    
+    stages {
+        stage('Checkout') {
             steps {
-                echo 'This is a build stage'
-				sh 'sleep 5'
-			}
-		}
-        stage('Push stage') {
+                git 'https://github.com/VishwaKalmat/java-example'
+            }
+        }
+        
+        stage('Build') {
             steps {
-                echo 'This is push stage'
-                sh 'sleep 5'
-			}
-		}
-        stage('Deploy stage') {
+                sh 'mvn clean package'
+            }
+        }
+
+        stage('SonarQube Analysis') {
             steps {
-                echo 'This is deploy stage'
-                sh 'sleep 5'
-			}
-		}
-	}
-}	
+                withSonarQubeEnv('sonar_qube_server1') {
+                    sh '''
+                        mvn sonar:sonar -Dsonar.projectKey=real project \
+                        -Dsonar.sources=src -Dsonar.java.binaries=target/classes
+                    '''
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 1, unit: 'HOURS') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+    }
+}
